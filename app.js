@@ -632,120 +632,57 @@ function activityTemplate(item, index) {
 }
 function renderActivities(list = activities) {
   activitiesGrid.innerHTML = list.map(activityTemplate).join('');
-  bindActivityToggles(); bindActivityCorrection(); initMatchingActivities(); updateStudentPanel();
+  bindActivityDelegation(); initMatchingActivities(); updateStudentPanel();
 }
-function bindActivityToggles() {
-  document.querySelectorAll('.toggle-answer').forEach(button => {
-    button.addEventListener('click', () => {
-      const answer = button.closest('.activity-card').querySelector('.answer-box');
+function bindActivityToggles() {}
+function bindActivityCorrection() {}
+let activityDelegationBound = false;
+function bindActivityDelegation() {
+  if (activityDelegationBound) return;
+  activityDelegationBound = true;
+  activitiesGrid.addEventListener('click', (event) => {
+    const toggleBtn = event.target.closest('.toggle-answer');
+    if (toggleBtn) {
+      const answer = toggleBtn.closest('.activity-card').querySelector('.answer-box');
       const isHidden = answer.hasAttribute('hidden');
-      if (isHidden) { answer.removeAttribute('hidden'); button.textContent = 'Ocultar solución'; }
-      else { answer.setAttribute('hidden', ''); button.textContent = 'Mostrar solución'; }
-    });
-  });
-  document.querySelectorAll('.clear-response').forEach(button => {
-    button.addEventListener('click', () => {
-      const card = button.closest('.activity-card'); const index = Number(card.dataset.activityIndex);
+      if (isHidden) { answer.removeAttribute('hidden'); toggleBtn.textContent = 'Ocultar solución'; }
+      else { answer.setAttribute('hidden', ''); toggleBtn.textContent = 'Mostrar solución'; }
+      return;
+    }
+    const clearBtn = event.target.closest('.clear-response');
+    if (clearBtn) {
+      const card = clearBtn.closest('.activity-card'); const index = Number(card.dataset.activityIndex);
       card.querySelectorAll('input[type="text"]').forEach(input => input.value = '');
       card.querySelectorAll('textarea').forEach(area => area.value = '');
       card.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+      card.querySelectorAll('.inline-input, .full-input, .response-textarea, .choice-chip').forEach(el => el.classList.remove('is-ok','is-review','is-bad'));
       if (card._matchState) { card._matchState.connections = []; card._matchState.selected = null; card.querySelectorAll('.match-item').forEach(el => el.classList.remove('selected', 'matched')); drawConnections(card); }
-      const fb = card.querySelector('.feedback-box'); fb.hidden = true; fb.className = 'feedback-box'; fb.innerHTML = '';
+      const fb = card.querySelector('.feedback-box'); if (fb) { fb.hidden = true; fb.className = 'feedback-box'; fb.innerHTML = ''; }
       activityStates.delete(index); card.classList.remove('done'); updateStudentPanel();
-    });
+      return;
+    }
+    const checkBtn = event.target.closest('.check-activity');
+    if (checkBtn) {
+      correctActivityCard(checkBtn.closest('.activity-card'));
+    }
   });
-}
-function extractUserAnswer(card, item) {
-  if (item.matchPairs) return (card._matchState?.connections || []).map(pair => `${pair.left} -> ${pair.right}`);
-  const blanks = [...card.querySelectorAll('.inline-input')]; if (blanks.length) return blanks.map(input => input.value.trim());
-  const checked = card.querySelector('input[type="radio"]:checked'); if (checked) return checked.value;
-  const text = card.querySelector('textarea, input.full-input'); return text ? text.value.trim() : '';
-}
-function evaluateActivity(item, response) {
-  const model = normalizeText(item.answer);
-  if (item.matchPairs) {
-    const total = item.matchPairs.length;
-    const ok = response.filter(pair => { const [l, r] = pair.split(' -> ').map(normalizeText); return item.matchPairs.some(([ml, mr]) => normalizeText(ml) === l && normalizeText(mr) === r); }).length;
-    if (ok === total) return {status: 'ok', message: '✔ Todas las uniones son correctas.'};
-    if (ok > 0) return {status: 'review', message: `Has unido bien ${ok} de ${total}. Revisa las restantes.`};
-    return {status: 'bad', message: '✘ Las uniones no coinciden todavía con la solución.'};
-  }
-  if (Array.isArray(response)) {
-    const targets = answerParts(item.answer); const filled = response.filter(Boolean); if (!filled.length) return {status: 'bad', message: '✘ No has escrito respuesta todavía.'};
-    let correct = 0; let minor = 0;
-    filled.forEach((value, idx) => { const target = targets[idx] || targets[0] || ''; const nv = normalizeText(value); if (nv === target || target.includes(nv)) correct += 1; else if (isMinorTypo(value, target)) { correct += 1; minor += 1; } });
-    if (correct === response.length && response.length >= targets.length) return minor ? {status: 'review', message: `✔ Contenido correcto. He detectado ${minor} falta${minor>1?'s':''} leve${minor>1?'s':''}.`} : {status: 'ok', message: '✔ Respuesta correcta.'};
-    if (correct > 0) return {status: 'review', message: 'Hay partes correctas, pero falta completar o ajustar alguna palabra.'};
-    return {status: 'bad', message: '✘ Revisa la respuesta y compárala con el resumen previo.'};
-  }
-  if (response === 'V' || response === 'F') { const expected = model.startsWith('verdadero') ? 'V' : 'F'; return response === expected ? {status: 'ok', message: '✔ Respuesta correcta.'} : {status: 'bad', message: '✘ Esa opción no es correcta.'}; }
-  const value = normalizeText(response); if (!value) return {status: 'bad', message: '✘ No has escrito respuesta todavía.'};
-  if (value === model || model.includes(value) || value.includes(model)) return {status: 'ok', message: '✔ Respuesta correcta.'};
-  if (isMinorTypo(response, item.answer)) return {status: 'review', message: '✔ La idea es correcta, pero hay una falta leve.'};
-  const keywords = answerParts(item.answer); const hits = keywords.filter(k => value.includes(k)).length;
-  if (hits >= Math.max(1, Math.ceil(keywords.length / 2))) return {status: 'review', message: 'La idea principal está bien, pero conviene afinarla un poco más.'};
-  return {status: 'bad', message: '✘ Respuesta incorrecta o demasiado incompleta.'};
-}
-function storeActivityResult(index, title, result) { activityStates.set(index, { title, ...result }); updateStudentPanel(); }
-function updateStudentPanel() {
-  const done = [...activityStates.values()]; const correct = done.filter(x => x.status === 'ok').length; const review = done.filter(x => x.status === 'review').length; const pending = activities.length - done.length;
-  progressCount.textContent = `${done.length} / ${activities.length}`; correctCount.textContent = String(correct); reviewCount.textContent = String(review); pendingCount.textContent = String(pending);
-  resultsPanel.innerHTML = done.slice().sort((a,b)=>a.title.localeCompare(b.title)).map(entry => `<div class="result-entry ${entry.status}"><strong>${entry.title}</strong><br>${entry.message}</div>`).join('');
-}
-function applyActivityFeedback(card, index, item, result) {
-  const box = card.querySelector('.feedback-box');
-  box.hidden = false;
-  box.className = `feedback-box ${result.status}`;
-  const label = result.status === 'ok' ? '✔ Correcta' : (result.status === 'review' ? '△ Casi' : '✘ Revisa');
-  box.innerHTML = `<span class="status-pill ${result.status}">${label}</span><p>${result.message}</p>`;
-  card.querySelectorAll('.inline-input, .full-input, .response-textarea').forEach(field => {
-    field.classList.remove('is-ok', 'is-review', 'is-bad');
-    field.classList.add(result.status === 'ok' ? 'is-ok' : result.status === 'review' ? 'is-review' : 'is-bad');
+  activitiesGrid.addEventListener('input', (event) => {
+    const field = event.target.closest('.inline-input, .full-input, .response-textarea');
+    if (!field) return;
+    const card = field.closest('.activity-card');
+    if (!card) return;
+    const item = activities[Number(card.dataset.activityIndex)];
+    const response = extractUserAnswer(card, item);
+    const result = evaluateActivity(item, response);
+    showActivityResult(card, item, result);
   });
-  card.classList.add('done');
-  storeActivityResult(index, item.title, result);
-}
-function runActivityCorrection(card, { hideIfEmpty = false } = {}) {
-  const index = Number(card.dataset.activityIndex);
-  const item = activities[index];
-  const response = extractUserAnswer(card, item);
-  const isEmpty = Array.isArray(response) ? response.every(v => !String(v || '').trim()) : !String(response || '').trim();
-  if (hideIfEmpty) {
-    const box = card.querySelector('.feedback-box');
-    box.hidden = true; box.className = 'feedback-box'; box.innerHTML = '';
-    card.querySelectorAll('.inline-input, .full-input, .response-textarea').forEach(field => field.classList.remove('is-ok', 'is-review', 'is-bad'));
-    activityStates.delete(index);
-    card.classList.remove('done');
-    updateStudentPanel();
-    return;
-  }
-  const result = evaluateActivity(item, response);
-  applyActivityFeedback(card, index, item, result);
-}
-function bindActivityCorrection() {
-  document.querySelectorAll('.check-activity').forEach(button => {
-    button.addEventListener('click', () => {
-      const card = button.closest('.activity-card');
-      runActivityCorrection(card);
-    });
-  });
-
-  document.querySelectorAll('.activity-card').forEach(card => {
-    card.querySelectorAll('.inline-input, .full-input, .response-textarea').forEach(field => {
-      field.addEventListener('input', () => {
-        const response = extractUserAnswer(card, activities[Number(card.dataset.activityIndex)]);
-        const isEmpty = Array.isArray(response) ? response.every(v => !String(v || '').trim()) : !String(response || '').trim();
-        runActivityCorrection(card, { hideIfEmpty: isEmpty });
-      });
-      field.addEventListener('blur', () => {
-        const response = extractUserAnswer(card, activities[Number(card.dataset.activityIndex)]);
-        const isEmpty = Array.isArray(response) ? response.every(v => !String(v || '').trim()) : !String(response || '').trim();
-        runActivityCorrection(card, { hideIfEmpty: isEmpty });
-      });
-    });
-    card.querySelectorAll('input[type="radio"]').forEach(radio => {
-      radio.addEventListener('change', () => runActivityCorrection(card));
-    });
+  activitiesGrid.addEventListener('change', (event) => {
+    const radio = event.target.closest('input[type="radio"]');
+    if (!radio) return;
+    const card = radio.closest('.activity-card');
+    const item = activities[Number(card.dataset.activityIndex)];
+    const result = evaluateActivity(item, extractUserAnswer(card, item));
+    showActivityResult(card, item, result);
   });
 }
 function getCenter(el, rootRect) { const r = el.getBoundingClientRect(); return { x: r.left - rootRect.left + r.width / 2, y: r.top - rootRect.top + r.height / 2 }; }
@@ -763,7 +700,8 @@ function initMatchingActivities() {
         const first = card._matchState.selected; const second = { side, value: el.dataset.value }; const left = first.side === 'left' ? first.value : second.value; const right = first.side === 'right' ? first.value : second.value;
         card._matchState.connections = card._matchState.connections.filter(pair => pair.left !== left && pair.right !== right); card._matchState.connections.push({ left, right }); card.querySelectorAll('.match-item').forEach(i => i.classList.remove('selected', 'matched'));
         card._matchState.connections.forEach(pair => { [...card.querySelectorAll('.match-item.left')].find(i => i.dataset.value === pair.left)?.classList.add('matched'); [...card.querySelectorAll('.match-item.right')].find(i => i.dataset.value === pair.right)?.classList.add('matched'); });
-        card._matchState.selected = null; drawConnections(card); if (card._matchState.connections.length) runActivityCorrection(card);
+        card._matchState.selected = null; drawConnections(card);
+        if (card._matchState.connections.length) { const result = evaluateActivity(item, extractUserAnswer(card, item)); showActivityResult(card, item, result); }
       });
     });
     drawConnections(card); window.addEventListener('resize', () => drawConnections(card));
