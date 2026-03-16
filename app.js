@@ -100,7 +100,8 @@ const activities = [
       'Los escribas eran especialistas de la escritura.'
     ],
     activity: 'Une. Cuneiforme → ______. Jeroglífica → ______. Escriba → ______.',
-    answer: 'Cuneiforme → Mesopotamia. Jeroglífica → Egipto. Escriba → especialista de la escritura.'
+    answer: 'Cuneiforme → Mesopotamia. Jeroglífica → Egipto. Escriba → especialista de la escritura.',
+    matchPairs: [['Cuneiforme','Mesopotamia'],['Jeroglífica','Egipto'],['Escriba','Especialista de la escritura']]
   },
   {
     title: 'Para qué se inventó la escritura',
@@ -196,7 +197,8 @@ const activities = [
       'Estos elementos aparecían en sus edificios.'
     ],
     activity: 'Une. Arquitectura mesopotámica → arco y bóveda.',
-    answer: 'La relación correcta es arquitectura mesopotámica → arco y bóveda.'
+    answer: 'La relación correcta es arquitectura mesopotámica → arco y bóveda.',
+    matchPairs: [['Arquitectura mesopotámica','Arco y bóveda'],['Zigurat','Templo escalonado'],['Adobe','Material de construcción']]
   },
   {
     title: 'Escultura mesopotámica',
@@ -352,7 +354,8 @@ const activities = [
       'Karnak, Luxor y Abu Simbel son ejemplos.'
     ],
     activity: 'Relaciona. Karnak, Luxor y Abu Simbel → ______.',
-    answer: 'Templos egipcios.'
+    answer: 'Templos egipcios.',
+    matchPairs: [['Karnak','Templo egipcio'],['Luxor','Templo egipcio'],['Abu Simbel','Templo egipcio']]
   },
   {
     title: 'Escultura egipcia',
@@ -553,6 +556,12 @@ const nextQuestion = document.getElementById('nextQuestion');
 const submitQuiz = document.getElementById('submitQuiz');
 const resetQuiz = document.getElementById('resetQuiz');
 const quizResult = document.getElementById('quizResult');
+const progressCount = document.getElementById('progressCount');
+const correctCount = document.getElementById('correctCount');
+const reviewCount = document.getElementById('reviewCount');
+const pendingCount = document.getElementById('pendingCount');
+const resultsPanel = document.getElementById('resultsPanel');
+const activityStates = new Map();
 
 function renderScheme() {
   schemeGrid.innerHTML = schemeData.map(item => `
@@ -572,134 +581,201 @@ function escapeHtml(text) {
     .replace(/'/g, '&#39;');
 }
 
+function normalizeText(text) {
+  return (text || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function levenshtein(a, b) {
+  const m = a.length; const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+function isMinorTypo(input, target) {
+  const a = normalizeText(input); const b = normalizeText(target);
+  if (!a || !b) return false;
+  const dist = levenshtein(a, b);
+  return dist > 0 && dist <= Math.max(1, Math.floor(b.length * 0.18));
+}
+function answerParts(answer) {
+  return answer.split(/[,.;]|\sy\s|→|\n/).map(s => normalizeText(s)).filter(Boolean);
+}
 function buildInteractivePrompt(item, index) {
   const safeText = escapeHtml(item.activity);
   const hasBlanks = /_{3,}/.test(item.activity);
-
+  if (item.matchPairs) {
+    const left = item.matchPairs.map(([l]) => `<button class="match-item left" type="button" data-side="left" data-value="${escapeHtml(l)}">${l}</button>`).join('');
+    const right = [...item.matchPairs].sort(() => Math.random() - 0.5).map(([, r]) => `<button class="match-item right" type="button" data-side="right" data-value="${escapeHtml(r)}">${r}</button>`).join('');
+    return `<p>${safeText}</p><div class="match-builder" data-match-index="${index}"><div class="match-column">${left}</div><div class="match-middle"><canvas class="match-canvas" width="200" height="260"></canvas></div><div class="match-column">${right}</div></div><p class="match-hint">Haz clic en una caja de la izquierda y luego en su pareja de la derecha para unirlas con el ratón.</p><div class="inline-actions"><button class="btn btn--soft clear-response" type="button">Borrar unión</button></div>`;
+  }
   if (hasBlanks) {
     let count = 0;
-    const htmlWithInputs = safeText.replace(/_{3,}/g, () => {
-      count += 1;
-      return `<input class="inline-input" type="text" aria-label="Respuesta ${count} de la actividad ${index + 1}" placeholder="Escribe aquí">`;
-    });
-    return `
-      <div class="interactive-zone">${htmlWithInputs}</div>
-      <div class="activity-tools">
-        <button class="btn btn--soft clear-response" type="button">Borrar respuesta</button>
-      </div>
-    `;
+    const htmlWithInputs = safeText.replace(/_{3,}/g, () => { count += 1; return `<input class="inline-input" type="text" data-blank-index="${count - 1}" aria-label="Respuesta ${count} de la actividad ${index + 1}" placeholder="Escribe aquí">`; });
+    return `<div class="interactive-zone">${htmlWithInputs}</div><div class="inline-actions"><button class="btn btn--soft clear-response" type="button">Borrar respuesta</button></div>`;
   }
-
   if (item.tag.toLowerCase().includes('verdadero')) {
-    return `
-      <div class="interactive-zone">
-        <span class="response-label">Marca tu respuesta:</span>
-        <label class="choice-chip"><input type="radio" name="vf-${index}" value="V"> <span>V</span></label>
-        <label class="choice-chip"><input type="radio" name="vf-${index}" value="F"> <span>F</span></label>
-      </div>
-    `;
+    return `<div class="interactive-zone"><span class="response-label">Marca tu respuesta:</span><label class="choice-chip"><input type="radio" name="vf-${index}" value="V"> <span>V</span></label><label class="choice-chip"><input type="radio" name="vf-${index}" value="F"> <span>F</span></label></div>`;
   }
-
-  if (item.tag.toLowerCase().includes('tipo test')) {
-    return `
-      <div class="interactive-zone">
-        <label class="response-label" for="open-${index}">Escribe tu respuesta:</label>
-        <input id="open-${index}" class="full-input" type="text" placeholder="Escribe aquí">
-      </div>
-    `;
+  if (item.tag.toLowerCase().includes('tipo test') || item.tag.toLowerCase().includes('definición') || item.tag.toLowerCase().includes('definir')) {
+    return `<div class="interactive-zone"><label class="response-label" for="open-${index}">Escribe tu respuesta:</label><input id="open-${index}" class="full-input" type="text" placeholder="Escribe aquí"></div><div class="inline-actions"><button class="btn btn--soft clear-response" type="button">Borrar respuesta</button></div>`;
   }
-
-  return `
-    <div class="interactive-zone">
-      <label class="response-label" for="open-${index}">Escribe tu respuesta:</label>
-      <textarea id="open-${index}" class="response-textarea" rows="3" placeholder="Escribe aquí"></textarea>
-      <div class="activity-tools">
-        <button class="btn btn--soft clear-response" type="button">Borrar respuesta</button>
-      </div>
-    </div>
-  `;
+  return `<div class="interactive-zone"><p>${safeText}</p><label class="response-label" for="open-${index}">Escribe tu respuesta:</label><textarea id="open-${index}" class="response-textarea" rows="3" placeholder="Escribe aquí"></textarea><div class="inline-actions"><button class="btn btn--soft clear-response" type="button">Borrar respuesta</button></div></div>`;
 }
-
 function activityTemplate(item, index) {
-  return `
-    <article class="activity-card card" data-keywords="${item.keywords}">
-      <div class="activity-card__head">
-        <div>
-          <h3>${index + 1}. ${item.title}</h3>
-        </div>
-        <span class="badge">${item.tag}</span>
-      </div>
-      <div class="activity-card__body">
-        <section class="summary-box">
-          <h4>Mini‑resumen previo</h4>
-          ${item.summary.map(p => `<p>${p}</p>`).join('')}
-        </section>
-        <section class="activity-box">
-          <h4>Actividad</h4>
-          ${buildInteractivePrompt(item, index)}
-        </section>
-        <button class="btn btn--ghost toggle-answer" type="button">Mostrar solución</button>
-        <section class="answer-box" hidden>
-          <h4>Solución orientativa</h4>
-          <p>${item.answer}</p>
-        </section>
-      </div>
-    </article>
-  `;
+  return `<article class="activity-card card" data-activity-index="${index}" data-keywords="${item.keywords}"><div class="activity-card__head"><div><h3>${index + 1}. ${item.title}</h3></div><span class="badge">${item.tag}</span></div><div class="activity-card__body"><section class="summary-box"><h4>Mini‑resumen previo</h4>${item.summary.map(p => `<p>${p}</p>`).join('')}</section><section class="activity-box"><h4>Actividad</h4>${buildInteractivePrompt(item, index)}</section><div class="inline-actions"><button class="btn check-activity" type="button">Corregir actividad</button><button class="btn btn--ghost toggle-answer" type="button">Mostrar solución</button></div><div class="feedback-box" hidden></div><section class="answer-box" hidden><h4>Solución orientativa</h4><p>${item.answer}</p></section></div></article>`;
 }
-
 function renderActivities(list = activities) {
   activitiesGrid.innerHTML = list.map(activityTemplate).join('');
-  bindActivityToggles();
+  bindActivityToggles(); bindActivityCorrection(); initMatchingActivities(); updateStudentPanel();
 }
-
 function bindActivityToggles() {
   document.querySelectorAll('.toggle-answer').forEach(button => {
     button.addEventListener('click', () => {
-      const answer = button.nextElementSibling;
+      const answer = button.closest('.activity-card').querySelector('.answer-box');
       const isHidden = answer.hasAttribute('hidden');
-      if (isHidden) {
-        answer.removeAttribute('hidden');
-        button.textContent = 'Ocultar solución';
-      } else {
-        answer.setAttribute('hidden', '');
-        button.textContent = 'Mostrar solución';
-      }
+      if (isHidden) { answer.removeAttribute('hidden'); button.textContent = 'Ocultar solución'; }
+      else { answer.setAttribute('hidden', ''); button.textContent = 'Mostrar solución'; }
     });
   });
-
   document.querySelectorAll('.clear-response').forEach(button => {
     button.addEventListener('click', () => {
-      const box = button.closest('.interactive-zone');
-      box.querySelectorAll('input[type="text"]').forEach(input => input.value = '');
-      box.querySelectorAll('textarea').forEach(area => area.value = '');
-      box.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+      const card = button.closest('.activity-card'); const index = Number(card.dataset.activityIndex);
+      card.querySelectorAll('input[type="text"]').forEach(input => input.value = '');
+      card.querySelectorAll('textarea').forEach(area => area.value = '');
+      card.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+      if (card._matchState) { card._matchState.connections = []; card._matchState.selected = null; card.querySelectorAll('.match-item').forEach(el => el.classList.remove('selected', 'matched')); drawConnections(card); }
+      const fb = card.querySelector('.feedback-box'); fb.hidden = true; fb.className = 'feedback-box'; fb.innerHTML = '';
+      activityStates.delete(index); card.classList.remove('done'); updateStudentPanel();
     });
   });
 }
+function extractUserAnswer(card, item) {
+  if (item.matchPairs) return (card._matchState?.connections || []).map(pair => `${pair.left} -> ${pair.right}`);
+  const blanks = [...card.querySelectorAll('.inline-input')]; if (blanks.length) return blanks.map(input => input.value.trim());
+  const checked = card.querySelector('input[type="radio"]:checked'); if (checked) return checked.value;
+  const text = card.querySelector('textarea, input.full-input'); return text ? text.value.trim() : '';
+}
+function evaluateActivity(item, response) {
+  const model = normalizeText(item.answer);
+  if (item.matchPairs) {
+    const total = item.matchPairs.length;
+    const ok = response.filter(pair => { const [l, r] = pair.split(' -> ').map(normalizeText); return item.matchPairs.some(([ml, mr]) => normalizeText(ml) === l && normalizeText(mr) === r); }).length;
+    if (ok === total) return {status: 'ok', message: '✔ Todas las uniones son correctas.'};
+    if (ok > 0) return {status: 'review', message: `Has unido bien ${ok} de ${total}. Revisa las restantes.`};
+    return {status: 'bad', message: '✘ Las uniones no coinciden todavía con la solución.'};
+  }
+  if (Array.isArray(response)) {
+    const targets = answerParts(item.answer); const filled = response.filter(Boolean); if (!filled.length) return {status: 'bad', message: '✘ No has escrito respuesta todavía.'};
+    let correct = 0; let minor = 0;
+    filled.forEach((value, idx) => { const target = targets[idx] || targets[0] || ''; const nv = normalizeText(value); if (nv === target || target.includes(nv)) correct += 1; else if (isMinorTypo(value, target)) { correct += 1; minor += 1; } });
+    if (correct === response.length && response.length >= targets.length) return minor ? {status: 'review', message: `✔ Contenido correcto. He detectado ${minor} falta${minor>1?'s':''} leve${minor>1?'s':''}.`} : {status: 'ok', message: '✔ Respuesta correcta.'};
+    if (correct > 0) return {status: 'review', message: 'Hay partes correctas, pero falta completar o ajustar alguna palabra.'};
+    return {status: 'bad', message: '✘ Revisa la respuesta y compárala con el resumen previo.'};
+  }
+  if (response === 'V' || response === 'F') { const expected = model.startsWith('verdadero') ? 'V' : 'F'; return response === expected ? {status: 'ok', message: '✔ Respuesta correcta.'} : {status: 'bad', message: '✘ Esa opción no es correcta.'}; }
+  const value = normalizeText(response); if (!value) return {status: 'bad', message: '✘ No has escrito respuesta todavía.'};
+  if (value === model || model.includes(value) || value.includes(model)) return {status: 'ok', message: '✔ Respuesta correcta.'};
+  if (isMinorTypo(response, item.answer)) return {status: 'review', message: '✔ La idea es correcta, pero hay una falta leve.'};
+  const keywords = answerParts(item.answer); const hits = keywords.filter(k => value.includes(k)).length;
+  if (hits >= Math.max(1, Math.ceil(keywords.length / 2))) return {status: 'review', message: 'La idea principal está bien, pero conviene afinarla un poco más.'};
+  return {status: 'bad', message: '✘ Respuesta incorrecta o demasiado incompleta.'};
+}
+function storeActivityResult(index, title, result) { activityStates.set(index, { title, ...result }); updateStudentPanel(); }
+function updateStudentPanel() {
+  const done = [...activityStates.values()]; const correct = done.filter(x => x.status === 'ok').length; const review = done.filter(x => x.status === 'review').length; const pending = activities.length - done.length;
+  progressCount.textContent = `${done.length} / ${activities.length}`; correctCount.textContent = String(correct); reviewCount.textContent = String(review); pendingCount.textContent = String(pending);
+  resultsPanel.innerHTML = done.slice().sort((a,b)=>a.title.localeCompare(b.title)).map(entry => `<div class="result-entry ${entry.status}"><strong>${entry.title}</strong><br>${entry.message}</div>`).join('');
+}
+function applyActivityFeedback(card, index, item, result) {
+  const box = card.querySelector('.feedback-box');
+  box.hidden = false;
+  box.className = `feedback-box ${result.status}`;
+  const label = result.status === 'ok' ? '✔ Correcta' : (result.status === 'review' ? '△ Casi' : '✘ Revisa');
+  box.innerHTML = `<span class="status-pill ${result.status}">${label}</span><p>${result.message}</p>`;
+  card.querySelectorAll('.inline-input, .full-input, .response-textarea').forEach(field => {
+    field.classList.remove('is-ok', 'is-review', 'is-bad');
+    field.classList.add(result.status === 'ok' ? 'is-ok' : result.status === 'review' ? 'is-review' : 'is-bad');
+  });
+  card.classList.add('done');
+  storeActivityResult(index, item.title, result);
+}
+function runActivityCorrection(card, { hideIfEmpty = false } = {}) {
+  const index = Number(card.dataset.activityIndex);
+  const item = activities[index];
+  const response = extractUserAnswer(card, item);
+  const isEmpty = Array.isArray(response) ? response.every(v => !String(v || '').trim()) : !String(response || '').trim();
+  if (hideIfEmpty) {
+    const box = card.querySelector('.feedback-box');
+    box.hidden = true; box.className = 'feedback-box'; box.innerHTML = '';
+    card.querySelectorAll('.inline-input, .full-input, .response-textarea').forEach(field => field.classList.remove('is-ok', 'is-review', 'is-bad'));
+    activityStates.delete(index);
+    card.classList.remove('done');
+    updateStudentPanel();
+    return;
+  }
+  const result = evaluateActivity(item, response);
+  applyActivityFeedback(card, index, item, result);
+}
+function bindActivityCorrection() {
+  document.querySelectorAll('.check-activity').forEach(button => {
+    button.addEventListener('click', () => {
+      const card = button.closest('.activity-card');
+      runActivityCorrection(card);
+    });
+  });
 
+  document.querySelectorAll('.activity-card').forEach(card => {
+    card.querySelectorAll('.inline-input, .full-input, .response-textarea').forEach(field => {
+      field.addEventListener('input', () => {
+        const response = extractUserAnswer(card, activities[Number(card.dataset.activityIndex)]);
+        const isEmpty = Array.isArray(response) ? response.every(v => !String(v || '').trim()) : !String(response || '').trim();
+        runActivityCorrection(card, { hideIfEmpty: isEmpty });
+      });
+      field.addEventListener('blur', () => {
+        const response = extractUserAnswer(card, activities[Number(card.dataset.activityIndex)]);
+        const isEmpty = Array.isArray(response) ? response.every(v => !String(v || '').trim()) : !String(response || '').trim();
+        runActivityCorrection(card, { hideIfEmpty: isEmpty });
+      });
+    });
+    card.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', () => runActivityCorrection(card));
+    });
+  });
+}
+function getCenter(el, rootRect) { const r = el.getBoundingClientRect(); return { x: r.left - rootRect.left + r.width / 2, y: r.top - rootRect.top + r.height / 2 }; }
+function drawConnections(card) {
+  if (!card._matchState) return; const canvas = card.querySelector('.match-canvas'); const builder = card.querySelector('.match-builder'); const rootRect = builder.getBoundingClientRect(); const ratio = window.devicePixelRatio || 1; canvas.width = Math.max(200, Math.floor(canvas.clientWidth * ratio)); canvas.height = Math.max(220, Math.floor(canvas.clientHeight * ratio)); const ctx = canvas.getContext('2d'); ctx.setTransform(ratio,0,0,ratio,0,0); ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight); ctx.lineWidth = 3; ctx.strokeStyle = '#1f6d83';
+  card._matchState.connections.forEach(pair => { const leftEl = [...card.querySelectorAll('.match-item.left')].find(el => el.dataset.value === pair.left); const rightEl = [...card.querySelectorAll('.match-item.right')].find(el => el.dataset.value === pair.right); if (!leftEl || !rightEl) return; const a = getCenter(leftEl, rootRect); const b = getCenter(rightEl, rootRect); ctx.beginPath(); ctx.moveTo(8, a.y); ctx.bezierCurveTo(canvas.clientWidth * 0.35, a.y, canvas.clientWidth * 0.65, b.y, canvas.clientWidth - 8, b.y); ctx.stroke(); });
+}
+function initMatchingActivities() {
+  document.querySelectorAll('.activity-card').forEach(card => {
+    const index = Number(card.dataset.activityIndex); const item = activities[index]; if (!item.matchPairs) return; card._matchState = { selected: null, connections: [] };
+    card.querySelectorAll('.match-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const side = el.dataset.side;
+        if (!card._matchState.selected || card._matchState.selected.side === side) { card.querySelectorAll(`.match-item.${side}`).forEach(i => i.classList.remove('selected')); el.classList.add('selected'); card._matchState.selected = { side, value: el.dataset.value }; return; }
+        const first = card._matchState.selected; const second = { side, value: el.dataset.value }; const left = first.side === 'left' ? first.value : second.value; const right = first.side === 'right' ? first.value : second.value;
+        card._matchState.connections = card._matchState.connections.filter(pair => pair.left !== left && pair.right !== right); card._matchState.connections.push({ left, right }); card.querySelectorAll('.match-item').forEach(i => i.classList.remove('selected', 'matched'));
+        card._matchState.connections.forEach(pair => { [...card.querySelectorAll('.match-item.left')].find(i => i.dataset.value === pair.left)?.classList.add('matched'); [...card.querySelectorAll('.match-item.right')].find(i => i.dataset.value === pair.right)?.classList.add('matched'); });
+        card._matchState.selected = null; drawConnections(card); if (card._matchState.connections.length) runActivityCorrection(card);
+      });
+    });
+    drawConnections(card); window.addEventListener('resize', () => drawConnections(card));
+  });
+}
 activitySearch.addEventListener('input', (event) => {
-  const q = event.target.value.trim().toLowerCase();
-  if (!q) return renderActivities();
-  const filtered = activities.filter(item =>
-    item.title.toLowerCase().includes(q) ||
-    item.tag.toLowerCase().includes(q) ||
-    item.keywords.toLowerCase().includes(q) ||
-    item.summary.join(' ').toLowerCase().includes(q) ||
-    item.activity.toLowerCase().includes(q)
-  );
+  const q = event.target.value.trim().toLowerCase(); if (!q) return renderActivities();
+  const filtered = activities.filter(item => item.title.toLowerCase().includes(q) || item.tag.toLowerCase().includes(q) || item.keywords.toLowerCase().includes(q) || item.summary.join(' ').toLowerCase().includes(q) || item.activity.toLowerCase().includes(q));
   renderActivities(filtered);
 });
-
-expandAll.addEventListener('click', () => {
-  document.querySelectorAll('.answer-box').forEach(box => box.removeAttribute('hidden'));
-  document.querySelectorAll('.toggle-answer').forEach(btn => btn.textContent = 'Ocultar solución');
-});
-collapseAll.addEventListener('click', () => {
-  document.querySelectorAll('.answer-box').forEach(box => box.setAttribute('hidden', ''));
-  document.querySelectorAll('.toggle-answer').forEach(btn => btn.textContent = 'Mostrar solución');
-});
-
+expandAll.addEventListener('click', () => { document.querySelectorAll('.answer-box').forEach(box => box.removeAttribute('hidden')); document.querySelectorAll('.toggle-answer').forEach(btn => btn.textContent = 'Ocultar solución'); });
+collapseAll.addEventListener('click', () => { document.querySelectorAll('.answer-box').forEach(box => box.setAttribute('hidden', '')); document.querySelectorAll('.toggle-answer').forEach(btn => btn.textContent = 'Mostrar solución'); });
 let currentQuestion = 0;
 const userAnswers = new Array(quizData.length).fill(null);
 let quizChecked = false;

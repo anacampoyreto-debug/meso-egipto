@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mesopotamia y Egipto · Aula Inclusiva</title>
+  <title>Mesopotamia y Egipto · Aula interactiva</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,13 +14,13 @@
     <div class="hero__overlay"></div>
     <div class="container hero__content">
       <div class="hero__text">
-        <span class="eyebrow">Historia · 1º ESO · Material inclusivo</span>
+        <span class="eyebrow">Historia · 1º ESO · Material interactivo</span>
         <h1>Mesopotamia y Egipto</h1>
-        <p class="lead">Web educativa con esquema, 30 actividades inclusivas precedidas de mini‑resúmenes y 100 preguntas tipo test autocorregibles.</p>
+        <p class="lead">Web educativa con esquema, 30 actividades precedidas de mini‑resúmenes y 100 preguntas tipo test autocorregibles.</p>
         <div class="hero__chips" aria-label="Características del material">
           <span>Frases claras</span>
           <span>Estructura visual</span>
-          <span>Apoyo para discapacidad auditiva</span>
+          <span>Actividades interactivas</span>
         </div>
       </div>
       <div class="hero__art" aria-hidden="true">
@@ -89,9 +89,16 @@
       <div class="container">
         <div class="section-head">
           <span class="section-kicker">Aprender haciendo</span>
-          <h2>30 actividades inclusivas</h2>
+          <h2>30 actividades interactivas</h2>
           <p>Cada actividad aparece precedida por un mini‑resumen muy breve y claro.</p>
         </div>
+        <div class="student-panel card">
+          <div class="student-panel__item"><span>Progreso</span><strong id="progressCount">0 / 30</strong></div>
+          <div class="student-panel__item"><span>Correctas</span><strong id="correctCount">0</strong></div>
+          <div class="student-panel__item"><span>Con ayuda</span><strong id="reviewCount">0</strong></div>
+          <div class="student-panel__item"><span>Pendientes</span><strong id="pendingCount">30</strong></div>
+        </div>
+        <div id="resultsPanel" class="results-panel" aria-live="polite"></div>
         <div class="controls">
           <input id="activitySearch" class="search" type="search" placeholder="Buscar por tema: escritura, Nilo, zigurat..." aria-label="Buscar actividades" />
           <button id="expandAll" class="btn btn--ghost">Abrir todo</button>
@@ -157,7 +164,7 @@
 
   <footer class="footer">
     <div class="container footer__wrap">
-      <p>Material web editable para aula inclusiva · Mesopotamia y Egipto</p>
+      <p>Material web editable · Mesopotamia y Egipto</p>
       <p class="muted">Diseño limpio, claro y preparado para adaptar.</p>
     </div>
   </footer>
