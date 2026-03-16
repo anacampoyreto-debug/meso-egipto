@@ -563,6 +563,63 @@ function renderScheme() {
   `).join('');
 }
 
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildInteractivePrompt(item, index) {
+  const safeText = escapeHtml(item.activity);
+  const hasBlanks = /_{3,}/.test(item.activity);
+
+  if (hasBlanks) {
+    let count = 0;
+    const htmlWithInputs = safeText.replace(/_{3,}/g, () => {
+      count += 1;
+      return `<input class="inline-input" type="text" aria-label="Respuesta ${count} de la actividad ${index + 1}" placeholder="Escribe aquí">`;
+    });
+    return `
+      <div class="interactive-zone">${htmlWithInputs}</div>
+      <div class="activity-tools">
+        <button class="btn btn--soft clear-response" type="button">Borrar respuesta</button>
+      </div>
+    `;
+  }
+
+  if (item.tag.toLowerCase().includes('verdadero')) {
+    return `
+      <div class="interactive-zone">
+        <span class="response-label">Marca tu respuesta:</span>
+        <label class="choice-chip"><input type="radio" name="vf-${index}" value="V"> <span>V</span></label>
+        <label class="choice-chip"><input type="radio" name="vf-${index}" value="F"> <span>F</span></label>
+      </div>
+    `;
+  }
+
+  if (item.tag.toLowerCase().includes('tipo test')) {
+    return `
+      <div class="interactive-zone">
+        <label class="response-label" for="open-${index}">Escribe tu respuesta:</label>
+        <input id="open-${index}" class="full-input" type="text" placeholder="Escribe aquí">
+      </div>
+    `;
+  }
+
+  return `
+    <div class="interactive-zone">
+      <label class="response-label" for="open-${index}">Escribe tu respuesta:</label>
+      <textarea id="open-${index}" class="response-textarea" rows="3" placeholder="Escribe aquí"></textarea>
+      <div class="activity-tools">
+        <button class="btn btn--soft clear-response" type="button">Borrar respuesta</button>
+      </div>
+    </div>
+  `;
+}
+
 function activityTemplate(item, index) {
   return `
     <article class="activity-card card" data-keywords="${item.keywords}">
@@ -579,7 +636,7 @@ function activityTemplate(item, index) {
         </section>
         <section class="activity-box">
           <h4>Actividad</h4>
-          <p>${item.activity}</p>
+          ${buildInteractivePrompt(item, index)}
         </section>
         <button class="btn btn--ghost toggle-answer" type="button">Mostrar solución</button>
         <section class="answer-box" hidden>
@@ -608,6 +665,15 @@ function bindActivityToggles() {
         answer.setAttribute('hidden', '');
         button.textContent = 'Mostrar solución';
       }
+    });
+  });
+
+  document.querySelectorAll('.clear-response').forEach(button => {
+    button.addEventListener('click', () => {
+      const box = button.closest('.interactive-zone');
+      box.querySelectorAll('input[type="text"]').forEach(input => input.value = '');
+      box.querySelectorAll('textarea').forEach(area => area.value = '');
+      box.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
     });
   });
 }
