@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mesopotamia y Egipto · Aula Inclusiva</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__overlay"></div>
+    <div class="container hero__content">
+      <div class="hero__text">
+        <span class="eyebrow">Historia · 1º ESO · Material inclusivo</span>
+        <h1>Mesopotamia y Egipto</h1>
+        <p class="lead">Web educativa con esquema, 30 actividades inclusivas precedidas de mini‑resúmenes y 100 preguntas tipo test autocorregibles.</p>
+        <div class="hero__chips" aria-label="Características del material">
+          <span>Frases claras</span>
+          <span>Estructura visual</span>
+          <span>Apoyo para discapacidad auditiva</span>
+        </div>
+      </div>
+      <div class="hero__art" aria-hidden="true">
+        <svg viewBox="0 0 520 360" class="scene">
+          <defs>
+            <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#fef3c7"/>
+              <stop offset="100%" stop-color="#fde68a"/>
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="520" height="360" rx="28" fill="url(#sky)"/>
+          <circle cx="424" cy="72" r="34" fill="#f59e0b" opacity="0.82"/>
+          <rect x="0" y="245" width="520" height="115" fill="#e7c98a"/>
+          <rect x="0" y="216" width="520" height="34" fill="#9ad0ec" opacity="0.95"/>
+          <path d="M35 210 C 110 180, 188 245, 278 212 S 420 190, 485 210" fill="none" stroke="#7cc6e7" stroke-width="10" stroke-linecap="round"/>
+          <g transform="translate(55 130)">
+            <rect x="20" y="70" width="145" height="18" rx="4" fill="#8b5e3c"/>
+            <rect x="36" y="52" width="112" height="18" rx="4" fill="#9a6a45"/>
+            <rect x="52" y="34" width="80" height="18" rx="4" fill="#a8764e"/>
+            <rect x="68" y="14" width="48" height="20" rx="4" fill="#b58357"/>
+            <rect x="84" y="0" width="16" height="16" fill="#5b3a1e"/>
+          </g>
+          <g transform="translate(305 108)">
+            <polygon points="70,12 132,132 8,132" fill="#d6a85c"/>
+            <polygon points="140,40 198,132 82,132" fill="#c7954d"/>
+            <polygon points="215,70 258,132 172,132" fill="#bb8540"/>
+          </g>
+          <g transform="translate(348 208)">
+            <rect x="0" y="24" width="78" height="46" rx="6" fill="#f6efe1"/>
+            <rect x="10" y="0" width="14" height="52" rx="5" fill="#6b7280"/>
+            <rect x="54" y="0" width="14" height="52" rx="5" fill="#6b7280"/>
+            <polygon points="-8,26 39,-2 86,26" fill="#d4af72"/>
+          </g>
+          <g opacity="0.9">
+            <path d="M28 230 c 10 -30 20 -40 30 -66 c 8 20 9 41 -8 67" fill="#6f9c63"/>
+            <path d="M58 230 c 12 -38 20 -52 31 -84 c 8 23 10 53 -7 84" fill="#7daa70"/>
+            <path d="M92 232 c 10 -30 18 -40 28 -66 c 6 20 8 41 -6 67" fill="#6f9c63"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <nav class="topnav">
+    <div class="container topnav__wrap">
+      <a href="#esquema">Esquema</a>
+      <a href="#actividades">30 actividades</a>
+      <a href="#test">100 preguntas</a>
+      <a href="#consejos">Consejos</a>
+    </div>
+  </nav>
+
+  <main>
+    <section id="esquema" class="section">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-kicker">Visión global</span>
+          <h2>Esquema del tema</h2>
+          <p>Ideas esenciales del contenido para observar antes de estudiar o antes de hacer actividades.</p>
+        </div>
+        <div id="schemeGrid" class="scheme-grid"></div>
+      </div>
+    </section>
+
+    <section id="actividades" class="section section--soft">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-kicker">Aprender haciendo</span>
+          <h2>30 actividades inclusivas</h2>
+          <p>Cada actividad aparece precedida por un mini‑resumen muy breve y claro.</p>
+        </div>
+        <div class="controls">
+          <input id="activitySearch" class="search" type="search" placeholder="Buscar por tema: escritura, Nilo, zigurat..." aria-label="Buscar actividades" />
+          <button id="expandAll" class="btn btn--ghost">Abrir todo</button>
+          <button id="collapseAll" class="btn btn--ghost">Cerrar todo</button>
+        </div>
+        <div id="activitiesGrid" class="activities-grid"></div>
+      </div>
+    </section>
+
+    <section id="test" class="section">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-kicker">Autoevaluación</span>
+          <h2>100 preguntas tipo test</h2>
+          <p>Selecciona una respuesta, corrige y comprueba el progreso. El banco de preguntas está organizado por bloques del tema.</p>
+        </div>
+        <div class="quiz-toolbar card">
+          <div>
+            <strong id="quizCounter">Pregunta 1 de 100</strong>
+            <p id="quizCategory" class="muted">Bloque</p>
+          </div>
+          <div class="quiz-toolbar__actions">
+            <button id="prevQuestion" class="btn btn--ghost">Anterior</button>
+            <button id="nextQuestion" class="btn btn--ghost">Siguiente</button>
+          </div>
+        </div>
+        <article id="quizCard" class="quiz-card card"></article>
+        <div class="quiz-bottom">
+          <button id="submitQuiz" class="btn">Corregir test</button>
+          <button id="resetQuiz" class="btn btn--ghost">Reiniciar</button>
+          <div id="quizResult" class="quiz-result" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="consejos" class="section section--soft">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-kicker">Uso en clase</span>
+          <h2>Consejos rápidos de aplicación</h2>
+        </div>
+        <div class="tips-grid">
+          <article class="tip card">
+            <h3>1. Secuencia visual</h3>
+            <p>Empieza con el esquema. Sigue con el mini‑resumen. Después realiza la actividad.</p>
+          </article>
+          <article class="tip card">
+            <h3>2. Frase corta</h3>
+            <p>Usa respuestas con sujeto, verbo y complemento. Evita respuestas largas.</p>
+          </article>
+          <article class="tip card">
+            <h3>3. Corrección guiada</h3>
+            <p>Corrige con color y lectura pausada. Marca la palabra clave de cada respuesta.</p>
+          </article>
+          <article class="tip card">
+            <h3>4. Repaso final</h3>
+            <p>Utiliza el test para repasar. Repite las preguntas falladas al final de la sesión.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__wrap">
+      <p>Material web editable para aula inclusiva · Mesopotamia y Egipto</p>
+      <p class="muted">Diseño limpio, claro y preparado para adaptar.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
